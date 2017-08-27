@@ -21,6 +21,7 @@
 
 from ctypes import *
 import bottle
+from bottle import request
 from cherrypy.wsgiserver import CherryPyWSGIServer
 from cherrypy.wsgiserver.ssl_pyopenssl import pyOpenSSLAdapter
 import datetime
