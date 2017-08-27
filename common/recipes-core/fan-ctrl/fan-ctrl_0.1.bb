@@ -19,18 +19,22 @@ DESCRIPTION = "The utilities to control fan."
 SECTION = "base"
 PR = "r1"
 LICENSE = "GPLv2"
-LIC_FILES_CHKSUM = "file://fand.cpp;beginline=6;endline=18;md5=da35978751a9d71b73679307c4d296ec"
+LIC_FILES_CHKSUM = "file://fand.cpp;beginline=7;endline=19;md5=da35978751a9d71b73679307c4d296ec"
 
 SRC_URI = "file://README \
            file://Makefile \
            file://fand.cpp \
            file://watchdog.h \
            file://watchdog.cpp \
+           file://w83795.h \
+           file://w83795.cpp \
+           file://platform_sensor_init.cpp \
           "
 
 S = "${WORKDIR}"
 
 binfiles = "fand \
+           platform_sensor_init \
            "
 
 otherfiles = "README"

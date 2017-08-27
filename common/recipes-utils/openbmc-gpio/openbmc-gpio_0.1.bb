@@ -23,6 +23,7 @@ LIC_FILES_CHKSUM = "file://COPYING;md5=eb723b61539feef013de476e68b5c50a"
 SRC_URI = " \
     file://COPYING \
     file://board_gpio_table.py \
+    file://ast2050_gpio_table.py \
     file://openbmc_gpio.py \
     file://openbmc_gpio_table.py \
     file://openbmc_gpio_util.py \
@@ -49,7 +50,9 @@ RDEPENDS_${PN} = "python-core python-argparse python-subprocess"
 
 do_board_defined_soc_table() {
     if [ "${OPENBMC_GPIO_SOC_TABLE}" != "soc_gpio_table.py" ]; then
-        mv -f "${S}/${OPENBMC_GPIO_SOC_TABLE}" "${S}/soc_gpio_table.py"
+        if [ "${OPENBMC_GPIO_SOC_TABLE}" != "ast2050_gpio_table.py" ]; then
+            mv -f "${S}/${OPENBMC_GPIO_SOC_TABLE}" "${S}/soc_gpio_table.py"
+        fi
     fi
 }
 addtask board_defined_soc_table after do_unpack before do_build

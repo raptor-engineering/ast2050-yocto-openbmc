@@ -1,6 +1,7 @@
 /*
  * fand
  *
+ * Copyright 2017 Raptor Engineering, LLC
  * Copyright 2014-present Facebook. All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -43,10 +44,11 @@
 /* XXX:  Both CONFIG_WEDGE and CONFIG_WEDGE100 are defined for Wedge100 */
 
 #if !defined(CONFIG_YOSEMITE) && !defined(CONFIG_WEDGE) && \
-    !defined(CONFIG_WEDGE100)
+    !defined(CONFIG_WEDGE100) && !defined(CONFIG_ASUS)
 #error "No hardware platform defined!"
 #endif
-#if defined(CONFIG_YOSEMITE) && defined(CONFIG_WEDGE)
+#if (defined(CONFIG_YOSEMITE) && defined(CONFIG_WEDGE)) || \
+    (defined(CONFIG_ASUS) && defined(CONFIG_WEDGE))
 #error "Two hardware platforms defined!"
 #endif
 
@@ -66,6 +68,10 @@
 #include <facebook/wedge_eeprom.h>
 #endif
 
+#if defined(CONFIG_ASUS)
+#define CONFIG_SLOPPY_FANS 1
+#endif
+
 #include "watchdog.h"
 
 /* Sensor definitions */
@@ -77,6 +83,9 @@
 #define INTERNAL_TEMPS(x) (x)
 #define EXTERNAL_TEMPS(x) (x)
 #define TOTAL_1S_SERVERS 4
+#elif defined(CONFIG_ASUS)
+#define INTERNAL_TEMPS(x) ((x) * 1000.0) // stored as C * 1000
+#define EXTERNAL_TEMPS(x) ((x) / 1000.0)
 #endif
 
 /*
@@ -93,6 +102,7 @@
 #endif
 
 #define BAD_TEMP INTERNAL_TEMPS(-60)
+#define BAD_VOLTAGE (-50)
 
 #define BAD_READ_THRESHOLD 4    /* How many times can reads fail */
 #define FAN_FAILURE_THRESHOLD 4 /* How many times can a fan fail */
@@ -162,10 +172,28 @@
 #elif defined(CONFIG_YOSEMITE)
 #define FAN_LED_RED "0"
 #define FAN_LED_BLUE "1"
+
+#elif defined(CONFIG_ASUS)
+#define PWM_DIR "/sys/class/i2c-adapter/i2c-1/1-002f/"
+
+#define FAN_READ_RPM_FORMAT "fan%d_input"
+#define PWM_UNIT_MAX 255
+
+#define CHIPSET_TEMP_DEVICE PWM_DIR "temp1_input"
+#define CPU1_TEMP_DEVICE PWM_DIR "temp7_input"
+#define CPU2_TEMP_DEVICE PWM_DIR "temp8_input"
+#define CPU2_VCORE_DEVICE PWM_DIR "in1_input"
+
+#define MAIN_POWER_OFF_DIRECTION "/sys/class/gpio/gpio40/direction"
+#define MAIN_POWER_OFF_CTL "/sys/class/gpio/gpio40/value"
+
+#define FAN_LED_RED "1"
+#define FAN_LED_BLUE "0"
+
 #endif
 
 #if (defined(CONFIG_YOSEMITE) || defined(CONFIG_WEDGE)) && \
-    !defined(CONFIG_WEDGE100)
+    !defined(CONFIG_WEDGE100) && !defined(CONFIG_ASUS)
 #define PWM_DIR "/sys/devices/platform/ast_pwm_tacho.0"
 
 #define PWM_UNIT_MAX 96
@@ -193,10 +221,15 @@ const char *fan_led[] = {FAN0_LED, FAN1_LED, FAN2_LED, FAN3_LED,
 
 #define INTAKE_LIMIT INTERNAL_TEMPS(60)
 #define SWITCH_LIMIT INTERNAL_TEMPS(80)
+#define CHIPSET_LIMIT INTERNAL_TEMPS(80)
 #if defined(CONFIG_YOSEMITE)
 #define USERVER_LIMIT INTERNAL_TEMPS(110)
 #else
 #define USERVER_LIMIT INTERNAL_TEMPS(90)
+#endif
+
+#if defined(CONFIG_ASUS)
+#define CPU_LIMIT INTERNAL_TEMPS(110)
 #endif
 
 #define TEMP_TOP INTERNAL_TEMPS(70)
@@ -214,7 +247,7 @@ const char *fan_led[] = {FAN0_LED, FAN1_LED, FAN2_LED, FAN3_LED,
 #define WEDGE_FAN_LOW 35
 #define WEDGE_FAN_MEDIUM 50
 #define WEDGE_FAN_HIGH 70
-#if defined(CONFIG_WEDGE100)
+#if defined(CONFIG_WEDGE100) || defined(CONFIG_ASUS)
 #define WEDGE_FAN_MAX 100
 #else
 #define WEDGE_FAN_MAX 99
@@ -251,6 +284,11 @@ int fan_to_pwm_map[] = {0, 1};
 #define FANS 2
 // Tacho offset between front and rear fans:
 #define REAR_FAN_OFFSET 1
+
+#elif defined(CONFIG_ASUS)
+int fan_to_rpm_map[] = {1, 2, 3, 4, 5, 6, 7, 8};
+int fan_to_pwm_map[] = {1, 1, 2, 2, 2, 2, 2, 2};	// 1 == 4 pin fans, 2 == 3 pin fans
+#define FANS 8
 
 #endif
 
@@ -364,6 +402,47 @@ struct rpm_to_pct_map *rpm_rear_map = rpm_map;
 #define FRONT_MAP_SIZE MAP_SIZE
 #define REAR_MAP_SIZE MAP_SIZE
 
+#elif defined(CONFIG_ASUS)
+struct rpm_to_pct_map rpm_front_map[] = {{15, 1804},
+                                         {20, 1864},
+                                         {25, 2011},
+                                         {30, 2268},
+                                         {35, 2683},
+                                         {40, 3110},
+                                         {45, 3619},
+                                         {50, 4017},
+                                         {55, 4455},
+                                         {60, 4720},
+                                         {65, 5113},
+                                         {70, 5487},
+                                         {75, 5973},
+                                         {80, 6428},
+                                         {85, 6994},
+                                         {90, 7417},
+                                         {95, 7941},
+                                         {100, 8490}};
+#define FRONT_MAP_SIZE (sizeof(rpm_front_map) / sizeof(struct rpm_to_pct_map))
+
+struct rpm_to_pct_map rpm_rear_map[] = {{15, 450},
+                                        {20, 600},
+                                        {25, 750},
+                                        {30, 900},
+                                        {35, 1050},
+                                        {40, 1200},
+                                        {45, 1350},
+                                        {50, 1500},
+                                        {55, 1550},
+                                        {60, 1600},
+                                        {65, 1650},
+                                        {70, 1700},
+                                        {75, 1750},
+                                        {80, 1800},
+                                        {85, 1850},
+                                        {90, 1900},
+                                        {95, 1950},
+                                        {100, 2000}};
+#define REAR_MAP_SIZE (sizeof(rpm_rear_map) / sizeof(struct rpm_to_pct_map))
+
 #endif
 
 /*
@@ -409,6 +488,45 @@ struct temp_to_pct_map cpu_map[] = {{-28, 10},
 #define CPU_MAP_SIZE (sizeof(cpu_map) / sizeof(struct temp_to_pct_map))
 #endif
 
+#if defined(CONFIG_ASUS)
+struct temp_to_pct_map chipset_map[] = {{30, 1},
+                                       {32, 5},
+                                       {35, 10},
+                                       {37, 15},
+                                       {40, 20},
+                                       {42, 25},
+                                       {45, 30},
+                                       {47, 35},
+                                       {50, 40},
+                                       {52, 45},
+                                       {55, 50},
+                                       {57, 55},
+                                       {60, 60},
+                                       {62, 65},
+                                       {65, 70},
+                                       {67, 80},
+                                       {70, 100}};
+#define CHIPSET_MAP_SIZE (sizeof(chipset_map) / sizeof(struct temp_to_pct_map))
+
+struct temp_to_pct_map cpu_map[] = {{38, 1},
+                                    {40, 5},
+                                    {42, 10},
+                                    {44, 15},
+                                    {46, 20},
+                                    {48, 25},
+                                    {50, 30},
+                                    {52, 35},
+                                    {54, 40},
+                                    {56, 45},
+                                    {58, 50},
+                                    {60, 55},
+                                    {62, 60},
+                                    {64, 65},
+                                    {66, 70},
+                                    {68, 80},
+                                    {70, 100}};
+#define CPU_MAP_SIZE (sizeof(cpu_map) / sizeof(struct temp_to_pct_map))
+#endif
 
 #define FAN_FAILURE_OFFSET 30
 
@@ -424,6 +542,14 @@ int temp_top = TEMP_TOP;
 
 int report_temp = REPORT_TEMP;
 bool verbose = false;
+
+#if defined(CONFIG_WEDGE)
+  int cpu2_installed = 0;
+#elif defined(CONFIG_ASUS)
+  int cpu2_installed = 1;
+#else
+  int cpu2_installed = 0;
+#endif
 
 void usage() {
   fprintf(stderr,
@@ -509,6 +635,28 @@ int read_temp(const char *device, int *value) {
   return read_device(full_name, value);
 }
 #endif
+
+#if defined(CONFIG_ASUS)
+int read_temp(const char *device, int *value) {
+  char full_name[LARGEST_DEVICE_NAME + 1];
+
+  /* We set an impossible value to check for errors */
+  *value = BAD_TEMP;
+  snprintf(
+      full_name, LARGEST_DEVICE_NAME, "%s", device);
+  return read_device(full_name, value);
+}
+#endif
+
+int read_voltage(const char *device, int *value) {
+  char full_name[LARGEST_DEVICE_NAME + 1];
+
+  /* We set an impossible value to check for errors */
+  *value = BAD_VOLTAGE;
+  snprintf(
+      full_name, LARGEST_DEVICE_NAME, "%s", device);
+  return read_device(full_name, value);
+}
 
 #if defined(CONFIG_WEDGE) && !defined(CONFIG_WEDGE100)
 int read_gpio_value(const int id, const char *device, int *value) {
@@ -644,6 +792,9 @@ int fan_rpm_to_pct(const struct rpm_to_pct_map *table,
 }
 
 int fan_speed_okay(const int fan, const int speed, const int slop) {
+#if defined(CONFIG_ASUS)
+  int real_fan_speed;
+#endif
   int front_fan, rear_fan;
   int front_pct, rear_pct;
   int real_fan;
@@ -656,6 +807,17 @@ int fan_speed_okay(const int fan, const int speed, const int slop) {
 
   real_fan = fan_to_rpm_map[fan];
 
+#if defined(CONFIG_ASUS)
+  real_fan_speed = 0;
+  read_fan_value(real_fan, FAN_READ_RPM_FORMAT, &real_fan_speed);
+  if (fan < 2) {
+    front_pct = fan_rpm_to_pct(rpm_front_map, FRONT_MAP_SIZE, real_fan_speed);
+  }
+  else {
+    front_pct = fan_rpm_to_pct(rpm_rear_map, REAR_MAP_SIZE, real_fan_speed);
+  }
+  front_fan = real_fan_speed;
+#else
   front_fan = 0;
   read_fan_value(real_fan, FAN_READ_RPM_FORMAT, &front_fan);
   front_pct = fan_rpm_to_pct(rpm_front_map, FRONT_MAP_SIZE, front_fan);
@@ -664,7 +826,7 @@ int fan_speed_okay(const int fan, const int speed, const int slop) {
   read_fan_value(real_fan + REAR_FAN_OFFSET, FAN_READ_RPM_FORMAT, &rear_fan);
   rear_pct = fan_rpm_to_pct(rpm_rear_map, REAR_MAP_SIZE, rear_fan);
 #endif
-
+#endif
 
   /*
    * If the fans are broken, the measured rate will be rather
@@ -681,6 +843,13 @@ int fan_speed_okay(const int fan, const int speed, const int slop) {
           abs(rear_pct - speed) * 100 / speed < slop);
 #else
   okay = (abs(front_pct - speed) * 100 / speed < slop);
+#endif
+
+#if defined(CONFIG_SLOPPY_FANS)
+   // Don't alert if fan is spinning faster than expected...
+   if (!okay && (front_pct > speed)) {
+       okay = 1;
+   }
 #endif
 
   if (!okay || verbose) {
@@ -703,6 +872,10 @@ int fan_speed_okay(const int fan, const int speed, const int slop) {
   return okay;
 }
 
+#if defined(CONFIG_ASUS)
+int averaged_pwm_values[2] = {0, 0};
+#endif
+
 /* Set fan speed as a percentage */
 
 int write_fan_speed(const int fan, const int value) {
@@ -717,16 +890,60 @@ int write_fan_speed(const int fan, const int value) {
   if (value == 0) {
 #if defined(CONFIG_WEDGE100)
     return write_fan_value(real_fan, "fantray%d_pwm", 0);
+#elif defined(CONFIG_ASUS)
+    return write_fan_value(real_fan, "pwm%d_enable", 0);
 #else
     return write_fan_value(real_fan, "pwm%d_en", 0);
 #endif
   } else {
-    int unit = value * PWM_UNIT_MAX / 100;
+    int unit = (value * PWM_UNIT_MAX) / 100;
     int status;
+
+#if defined(CONFIG_ASUS)
+    // The KGPE-D16 / KCMA-D8 only has two fan outputs; one controls all 4 pin fans,
+    // and the other controls all 3 pin fans.  Average the requested PWM values
+    // as a middle-of-the-road thermal strategy...
+    if (fan == 0) {
+        if (cpu2_installed) {
+            averaged_pwm_values[0] = unit;
+            return 0;
+        }
+    }
+    else if (fan == 1) {
+        if (cpu2_installed) {
+          averaged_pwm_values[0] += unit;
+          averaged_pwm_values[0] /= 2;
+          unit = averaged_pwm_values[0];
+       }
+       else {
+         return 0;
+       }
+    }
+    else if (fan == 2) {
+        averaged_pwm_values[1] = unit;
+        return 0;
+    }
+    else if ((fan > 2) && (fan < 7)) {
+        averaged_pwm_values[1] += unit;
+        return 0;
+    }
+    else if (fan == 7) {
+        averaged_pwm_values[1] += unit;
+        averaged_pwm_values[1] /= 6;
+        unit = averaged_pwm_values[1];
+    }
+#endif
 
 #if defined(CONFIG_WEDGE100)
     // Note that PWM for Wedge100 is in 32nds of a cycle
     return write_fan_value(real_fan, "fantray%d_pwm", unit);
+#elif defined(CONFIG_ASUS)
+    if ((status = write_fan_value(real_fan, "pwm%d_enable", 1)) != 0) {
+      return status;
+    }
+    if ((status = write_fan_value(real_fan, "pwm%d", unit)) != 0) {
+      return status;
+    }
 #else
     if (unit == PWM_UNIT_MAX)
       unit = 0;
@@ -741,7 +958,7 @@ int write_fan_speed(const int fan, const int value) {
   }
 }
 
-#if defined(CONFIG_YOSEMITE)
+#if defined(CONFIG_YOSEMITE) || defined(CONFIG_ASUS)
 int temp_to_fan_speed(int temp, struct temp_to_pct_map *map, int map_size) {
   int i = map_size - 1;
 
@@ -796,11 +1013,17 @@ int server_shutdown(const char *why) {
     system("rmmod adm1275");
     system("i2cset -y 12 0x10 0x01 00");
   }
+#elif defined(CONFIG_ASUS)
+    write_device(MAIN_POWER_OFF_DIRECTION, "out");
+    write_device(MAIN_POWER_OFF_CTL, "0");
+    sleep(1);
+    write_device(MAIN_POWER_OFF_CTL, "1");
 #else
   // TODO(7088822):  try throttling, then shutting down server.
   syslog(LOG_EMERG, "Need to implement actual shutdown!\n");
 #endif
 
+#if !defined(CONFIG_ASUS)
   /*
    * We have to stop the watchdog, or the system will be automatically
    * rebooted some seconds after fand exits (and stops kicking the
@@ -811,6 +1034,7 @@ int server_shutdown(const char *why) {
 
   sleep(2);
   exit(2);
+#endif
 }
 
 /* Gracefully shut down on receipt of a signal */
@@ -837,6 +1061,11 @@ int main(int argc, char **argv) {
   int exhaust_temp;
   int switch_temp;
   int userver_temp;
+#elif defined(CONFIG_ASUS)
+  int chipset_temp;
+  int cpu1_temp;
+  int cpu2_temp;
+  int cpu2_vcore_mv;
 #else
   float intake_temp;
   float exhaust_temp;
@@ -848,6 +1077,13 @@ int main(int argc, char **argv) {
   int fan_failure = 0;
   int fan_speed_changes = 0;
   int old_speed;
+
+  int cpu_fan_speed = fan_high;
+  int chassis_fan_speed = fan_high;
+  int cpu_fan_speed_changes = 0;
+  int chassis_fan_speed_changes = 0;
+  int cpu_old_speed = fan_high;
+  int chassis_old_speed = fan_high;
 
   int fan_bad[FANS];
   int fan;
@@ -942,6 +1178,9 @@ int main(int argc, char **argv) {
   }
 
   for (fan = 0; fan < total_fans; fan++) {
+    if (!cpu2_installed && (fan == 1)) {
+      continue;
+    }
     fan_bad[fan] = 0;
     write_fan_speed(fan + fan_offset, fan_speed);
     write_fan_led(fan + fan_offset, FAN_LED_BLUE);
@@ -980,6 +1219,8 @@ int main(int argc, char **argv) {
   while (1) {
     int max_temp;
     old_speed = fan_speed;
+    cpu_old_speed = cpu_fan_speed;
+    chassis_old_speed = chassis_fan_speed;
 
     /* Read sensors */
 
@@ -997,6 +1238,31 @@ int main(int argc, char **argv) {
     if ((intake_temp == BAD_TEMP || exhaust_temp == BAD_TEMP ||
          switch_temp == BAD_TEMP)) {
       bad_reads++;
+    }
+#elif defined(CONFIG_ASUS)
+    read_temp(CHIPSET_TEMP_DEVICE, &chipset_temp);
+    read_temp(CPU1_TEMP_DEVICE, &cpu1_temp);
+    read_temp(CPU2_TEMP_DEVICE, &cpu2_temp);
+    read_voltage(CPU2_VCORE_DEVICE, &cpu2_vcore_mv);
+
+    /*
+     * uServer can be powered down, but all of the rest of the sensors
+     * should be readable at any time.
+     */
+
+    if ((chipset_temp == BAD_TEMP) || (cpu1_temp == BAD_TEMP) ||
+         (cpu2_temp == BAD_TEMP) || (cpu2_vcore_mv == BAD_VOLTAGE)) {
+      bad_reads++;
+    }
+    else {
+      bad_reads = 0;	// Only care about continuous bad reads
+    }
+
+    if (cpu2_vcore_mv == 0) {
+      cpu2_installed = 0;
+    }
+    else {
+      cpu2_installed = 1;
     }
 #else
     intake_temp = exhaust_temp = userver_temp = BAD_TEMP;
@@ -1025,8 +1291,51 @@ int main(int argc, char **argv) {
 
     if (bad_reads > BAD_READ_THRESHOLD) {
       server_shutdown("Some sensors couldn't be read");
+      bad_reads = 0;
+      kick_watchdog();
+      continue;
     }
 
+#if defined(CONFIG_ASUS)
+    if (log_count++ % report_temp == 0) {
+      syslog(LOG_DEBUG,
+             "Temp chipset %f, CPU1 %f, CPU2 %f, "
+             "CPU fan speed %d, CPU speed changes %d"
+             "chassis fan speed %d, chassis speed changes %d",
+             EXTERNAL_TEMPS((float)chipset_temp),
+             EXTERNAL_TEMPS((float)cpu1_temp),
+             EXTERNAL_TEMPS((float)cpu2_temp),
+             cpu_fan_speed,
+             cpu_fan_speed_changes,
+             chassis_fan_speed,
+             chassis_fan_speed_changes);
+    }
+
+    /* Protection heuristics */
+
+    if (chipset_temp > CHIPSET_LIMIT) {
+      server_shutdown("Chipset temp limit reached");
+      bad_reads = 0;
+      kick_watchdog();
+      continue;
+    }
+
+    if (cpu1_temp > CPU_LIMIT) {
+      server_shutdown("CPU1 temp limit reached");
+      bad_reads = 0;
+      kick_watchdog();
+      continue;
+    }
+
+    if (cpu2_installed) {
+      if (cpu2_temp > CPU_LIMIT) {
+        server_shutdown("CPU2 temp limit reached");
+        bad_reads = 0;
+        kick_watchdog();
+        continue;
+      }
+    }
+#else
     if (log_count++ % report_temp == 0) {
       syslog(LOG_DEBUG,
 #if defined(CONFIG_WEDGE) || defined(CONFIG_WEDGE100)
@@ -1051,17 +1360,27 @@ int main(int argc, char **argv) {
 
     if (intake_temp > INTAKE_LIMIT) {
       server_shutdown("Intake temp limit reached");
+      bad_reads = 0;
+      kick_watchdog();
+      continue;
     }
 
 #if defined(CONFIG_WEDGE) || defined(CONFIG_WEDGE100)
     if (switch_temp > SWITCH_LIMIT) {
       server_shutdown("T2 temp limit reached");
+      bad_reads = 0;
+      kick_watchdog();
+      continue;
     }
 #endif
 
     if (userver_temp + USERVER_TEMP_FUDGE > USERVER_LIMIT) {
       server_shutdown("uServer temp limit reached");
+      bad_reads = 0;
+      kick_watchdog();
+      continue;
     }
+#endif
 
     /*
      * Calculate change needed -- we should eventually
@@ -1085,9 +1404,31 @@ int main(int argc, char **argv) {
     } else {
       fan_speed = cpu_speed;
     }
+#elif defined(CONFIG_ASUS)
+    int max_cpu_temp = cpu1_temp + USERVER_TEMP_FUDGE;
+
+    if (cpu2_installed) {
+      if (cpu2_temp + USERVER_TEMP_FUDGE > max_cpu_temp) {
+        max_cpu_temp = cpu2_temp + USERVER_TEMP_FUDGE;
+      }
+    }
+
+    int chassis_speed = temp_to_fan_speed(EXTERNAL_TEMPS(chipset_temp), chipset_map,
+                                         CHIPSET_MAP_SIZE);
+    int cpu_speed = temp_to_fan_speed(EXTERNAL_TEMPS(max_cpu_temp), cpu_map, CPU_MAP_SIZE);
+
+    if (cpu_fan_speed == fan_max && fan_failure != 0) {
+      /* Don't change a thing */
+    } else {
+      cpu_fan_speed = cpu_speed;
+    }
+    if (chassis_fan_speed == fan_max && fan_failure != 0) {
+      /* Don't change a thing */
+    } else {
+      chassis_fan_speed = chassis_speed;
+    }
 #else
     /* Other systems use a simpler built-in table to determine fan speed. */
-
     if (switch_temp > userver_temp + USERVER_TEMP_FUDGE) {
       max_temp = switch_temp;
     } else {
@@ -1125,6 +1466,31 @@ int main(int argc, char **argv) {
      * earlier, all remaining fans should continue to run at max speed.
      */
 
+#if defined(CONFIG_ASUS)
+    if (fan_failure == 0 && cpu_fan_speed != cpu_old_speed) {
+      syslog(LOG_NOTICE,
+             "CPU fan speed changing from %d to %d",
+             cpu_old_speed,
+             cpu_fan_speed);
+      cpu_fan_speed_changes++;
+    }
+    if (fan_failure == 0 && chassis_fan_speed != chassis_old_speed) {
+      syslog(LOG_NOTICE,
+             "Chassis fan speed changing from %d to %d",
+             chassis_old_speed,
+             chassis_fan_speed);
+      chassis_fan_speed_changes++;
+    }
+    for (fan = 0; fan < 2; fan++) {
+      if (!cpu2_installed && (fan == 1)) {
+        continue;
+      }
+      write_fan_speed(fan + fan_offset, cpu_fan_speed);
+    }
+    for (fan = 2; fan < total_fans; fan++) {
+      write_fan_speed(fan + fan_offset, chassis_fan_speed);
+    }
+#else
     if (fan_failure == 0 && fan_speed != old_speed) {
       syslog(LOG_NOTICE,
              "Fan speed changing from %d to %d",
@@ -1132,9 +1498,13 @@ int main(int argc, char **argv) {
              fan_speed);
       fan_speed_changes++;
       for (fan = 0; fan < total_fans; fan++) {
+        if (!cpu2_installed && (fan == 1)) {
+          continue;
+        }
         write_fan_speed(fan + fan_offset, fan_speed);
       }
     }
+#endif
 
     /*
      * Wait for some change.  Typical I2C temperature sensors
@@ -1150,11 +1520,22 @@ int main(int argc, char **argv) {
     /* Check fan RPMs */
 
     for (fan = 0; fan < total_fans; fan++) {
+      if (!cpu2_installed && (fan == 1)) {
+        continue;
+      }
       /*
        * Make sure that we're within some percentage
        * of the requested speed.
        */
+#if defined(CONFIG_ASUS)
+      int desired_fan_speed = cpu_fan_speed;
+      if (fan > 1) {
+        desired_fan_speed = chassis_fan_speed;
+      }
+      if (fan_speed_okay(fan + fan_offset, desired_fan_speed, FAN_FAILURE_OFFSET)) {
+#else
       if (fan_speed_okay(fan + fan_offset, fan_speed, FAN_FAILURE_OFFSET)) {
+#endif
         if (fan_bad[fan] > FAN_FAILURE_THRESHOLD) {
           write_fan_led(fan + fan_offset, FAN_LED_BLUE);
           syslog(LOG_CRIT,
@@ -1169,6 +1550,9 @@ int main(int argc, char **argv) {
 
     fan_failure = 0;
     for (fan = 0; fan < total_fans; fan++) {
+      if (!cpu2_installed && (fan == 1)) {
+        continue;
+      }
       if (fan_bad[fan] > FAN_FAILURE_THRESHOLD) {
         fan_failure++;
         write_fan_led(fan + fan_offset, FAN_LED_RED);
@@ -1190,8 +1574,13 @@ int main(int argc, char **argv) {
        */
 
       fan_speed = fan_max;
+      cpu_fan_speed = fan_max;
+      chassis_fan_speed = fan_max;
       for (fan = 0; fan < total_fans; fan++) {
-        write_fan_speed(fan + fan_offset, fan_speed);
+        if (!cpu2_installed && (fan == 1)) {
+          continue;
+        }
+        write_fan_speed(fan + fan_offset, fan_max);
       }
 
 #if defined(CONFIG_WEDGE) || defined(CONFIG_WEDGE100)
@@ -1206,11 +1595,17 @@ int main(int argc, char **argv) {
       if (fan_failure == total_fans) {
         int count = 0;
         for (fan = 0; fan < total_fans; fan++) {
+          if (!cpu2_installed && (fan == 1)) {
+            continue;
+          }
           if (fan_bad[fan] > FAN_SHUTDOWN_THRESHOLD)
             count++;
         }
         if (count == total_fans) {
           server_shutdown("all fans are bad for more than 12 cycles");
+          bad_reads = 0;
+          kick_watchdog();
+          continue;
         }
       }
 #endif

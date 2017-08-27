@@ -1,6 +1,7 @@
 /*
  * watchdog
  *
+ * Copyright 2017 Raptor Engineering, LLC
  * Copyright 2014-present Facebook. All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -25,12 +26,21 @@
 #include <pthread.h>
 #include <syslog.h>
 #include <unistd.h>
+#include <time.h>
+#include <sys/ioctl.h>
+#include <linux/watchdog.h>
+
+// #define DEBUG_WATCHDOG 1
 
 #define WATCHDOG_START_KEY "x"
 #define WATCHDOG_STOP_KEY "X"
 /* The "magic close" character (as defined in Linux watchdog specs). */
 #define WATCHDOG_PERSISTENT_KEY "V"
 #define WATCHDOG_NON_PERSISTENT_KEY "a"
+
+#ifdef DEBUG_WATCHDOG
+static time_t watchdog_last_kick = 0;
+#endif
 
 static int watchdog_dev = -1;
 
@@ -104,7 +114,7 @@ int start_watchdog(const int auto_mode) {
     return 0;
   }
 
-  while (((watchdog_dev = open("/dev/watchdog", O_WRONLY)) == -1) &&
+  while (((watchdog_dev = open("/dev/watchdog", O_RDWR)) == -1) &&
     errno == EINTR);
 
   /* Fail if watchdog device is invalid or if the user asked for auto
@@ -118,6 +128,9 @@ int start_watchdog(const int auto_mode) {
   while ((status = write(watchdog_dev, WATCHDOG_START_KEY, 1)) == 0
          && errno == EINTR);
   pthread_mutex_unlock(&watchdog_lock);
+#ifdef DEBUG_WATCHDOG
+  watchdog_last_kick = time(NULL);
+#endif
   syslog(LOG_INFO, "system watchdog started.\n");
   return 1;
 
@@ -162,6 +175,16 @@ void set_persistent_watchdog(enum watchdog_persistent_en persistent) {
 
 static int kick_watchdog_unsafe() {
   int status = 0;
+#ifdef DEBUG_WATCHDOG
+  int timeout = -1;
+  if (ioctl(watchdog_dev, WDIOC_GETTIMEOUT, &timeout) < 0) {
+    syslog(LOG_DEBUG, "Watchdog: WDIOC_GETTIMEOUT ioctl failed with errno %d\n", errno);
+  }
+  else {
+    syslog(LOG_DEBUG, "Watchdog: timeout set to %d seconds (last kick was %d seconds ago)\n", timeout, time(NULL) - watchdog_last_kick);
+  }
+  watchdog_last_kick = time(NULL);
+#endif
   if (watchdog_dev != -1) {
     while ((status = write(watchdog_dev, watchdog_kick_key, 1)) == 0
            && errno == EINTR);

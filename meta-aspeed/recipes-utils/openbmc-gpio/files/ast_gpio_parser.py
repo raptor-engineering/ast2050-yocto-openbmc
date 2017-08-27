@@ -167,7 +167,7 @@ class AstGPIO(object):
             if line is None:
                 break
 
-            logging.debug('Parsing line: %s' % line)
+            logging.warning('Parsing line: %s' % line)
 
             # V21,ROMA24,SCU88[28]=1 & SCU94[1]=0,VPOR6,SCU88[28]=1 & SCU94[1]=1,GPIOR4
             pin = line[0]
@@ -175,7 +175,7 @@ class AstGPIO(object):
                 # empty line
                 continue
             funcs = self._parse_funcs(line[1:])
-            logging.debug('%s: %s' % (pin, funcs))
+            logging.warning('%s: %s' % (pin, funcs))
             assert pin not in self.pins
             self.pins[pin] = funcs
 

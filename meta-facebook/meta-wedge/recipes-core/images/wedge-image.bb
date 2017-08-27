@@ -1,1 +1,0 @@
-include wedge-image.inc

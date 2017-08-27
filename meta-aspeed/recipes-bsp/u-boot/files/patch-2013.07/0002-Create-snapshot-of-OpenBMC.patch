@@ -110,7 +110,7 @@ index ce6bff1..556de75 100644
 @@ -73,6 +73,9 @@ VCMA9                        arm         arm920t     vcma9               mpl
  smdk2410                     arm         arm920t     -                   samsung        s3c24x0
  omap1510inn                  arm         arm925t     -                   ti
- wedge                        arm         arm926ejs   ast2400             aspeed         aspeed
+ asus                         arm         arm926ejs   ast2050             aspeed         aspeed
 +wedge100                     arm         arm926ejs   ast2400             aspeed         aspeed
 +fbyosemite                   arm         arm926ejs   ast2400             aspeed         aspeed
 +fbplatform1                  arm         arm926ejs   ast2400             aspeed         aspeed

@@ -776,7 +776,7 @@ index 674896b..ce6bff1 100644
  smdk2410                     arm         arm920t     -                   samsung        s3c24x0
  omap1510inn                  arm         arm925t     -                   ti
 -ast2400                      arm         arm926ejs   ast2400             aspeed         aspeed
-+wedge                        arm         arm926ejs   ast2400             aspeed         aspeed
++asus                         arm         arm926ejs   ast2050             aspeed         aspeed
  integratorap_cm926ejs        arm         arm926ejs   integrator          armltd         -           integratorap:CM926EJ_S
  integratorcp_cm926ejs        arm         arm926ejs   integrator          armltd         -           integratorcp:CM924EJ_S
  aspenite                     arm         arm926ejs   -                   Marvell        armada100
@@ -1222,11 +1222,11 @@ index 6b1ce05..d75ef67 100644
        printf("Unknow Chip_ID %x\n",Chip_ID);
      }
    }
-diff --git a/include/configs/wedge.h b/include/configs/wedge.h
+diff --git a/include/configs/asus.h b/include/configs/asus.h
 new file mode 100644
 index 0000000..6bb7639
 --- /dev/null
-+++ b/include/configs/wedge.h
++++ b/include/configs/asus.h
 @@ -0,0 +1,350 @@
 +/*
 + * Copyright 2004-present Facebook. All Rights Reserved.
