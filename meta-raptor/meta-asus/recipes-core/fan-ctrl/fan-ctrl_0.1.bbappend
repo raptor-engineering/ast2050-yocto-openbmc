@@ -22,6 +22,7 @@ SRC_URI += "file://get_fan_speed.sh \
             file://set_fan_speed.sh \
             file://init_pwm.sh \
             file://setup-fan.sh \
+            file://ast2050-timer-workaround.sh \
            "
 
 S = "${WORKDIR}"
@@ -32,6 +33,7 @@ binfiles = "                                    \
     init_pwm.sh					\
     fand					\
     platform_sensor_init			\
+    ast2050-timer-workaround.sh			\
     "
 
 CXXFLAGS_prepend = "-DCONFIG_ASUS "

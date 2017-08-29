@@ -28,6 +28,10 @@
 # Short-Description: Set fan speed
 ### END INIT INFO
 
+echo -n "Start AST2050 timer workaround..."
+/usr/local/bin/ast2050-timer-workaround.sh > /dev/null
+echo "done".
+
 echo -n "Setup fan speed... "
 rmmod w83795 || true
 /usr/local/bin/platform_sensor_init
