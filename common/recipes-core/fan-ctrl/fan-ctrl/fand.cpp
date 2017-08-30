@@ -264,30 +264,34 @@ const char *fan_led[] = {FAN0_LED, FAN1_LED, FAN2_LED, FAN3_LED,
  */
 
 #if defined(CONFIG_WEDGE100)
-int fan_to_rpm_map[] = {1, 3, 5, 7, 9};
-int fan_to_pwm_map[] = {1, 2, 3, 4, 5};
+int fan_population_map[] = {1, 1, 1, 1, 1};
+int fan_to_rpm_map[]     = {1, 3, 5, 7, 9};
+int fan_to_pwm_map[]     = {1, 2, 3, 4, 5};
 #define FANS 5
 // Tacho offset between front and rear fans:
 #define REAR_FAN_OFFSET 1
 #define BACK_TO_BACK_FANS
 
 #elif defined(CONFIG_WEDGE)
-int fan_to_rpm_map[] = {3, 2, 0, 1};
-int fan_to_pwm_map[] = {7, 6, 0, 1};
+int fan_population_map[] = {1, 1, 1, 1};
+int fan_to_rpm_map[]     = {3, 2, 0, 1};
+int fan_to_pwm_map[]     = {7, 6, 0, 1};
 #define FANS 4
 // Tacho offset between front and rear fans:
 #define REAR_FAN_OFFSET 4
 #define BACK_TO_BACK_FANS
 #elif defined(CONFIG_YOSEMITE)
-int fan_to_rpm_map[] = {0, 1};
-int fan_to_pwm_map[] = {0, 1};
+int fan_population_map[] = {1, 1};
+int fan_to_rpm_map[]     = {0, 1};
+int fan_to_pwm_map[]     = {0, 1};
 #define FANS 2
 // Tacho offset between front and rear fans:
 #define REAR_FAN_OFFSET 1
 
 #elif defined(CONFIG_ASUS)
-int fan_to_rpm_map[] = {1, 2, 3, 4, 5, 6, 7, 8};
-int fan_to_pwm_map[] = {1, 1, 2, 2, 2, 2, 2, 2};	// 1 == 4 pin fans, 2 == 3 pin fans
+int fan_population_map[] = {1, 1, 1, 1, 1, 1, 1, 1};	// 1 == fan populated, 0 == fan disconnected
+int fan_to_rpm_map[]     = {1, 2, 3, 4, 5, 6, 7, 8};
+int fan_to_pwm_map[]     = {1, 1, 2, 2, 2, 2, 2, 2};	// 1 == 4 pin fans, 2 == 3 pin fans
 #define FANS 8
 
 #endif
@@ -1523,6 +1527,9 @@ int main(int argc, char **argv) {
       if (!cpu2_installed && (fan == 1)) {
         continue;
       }
+      if (fan_population_map[fan] == 0) {
+        continue;
+      }
       /*
        * Make sure that we're within some percentage
        * of the requested speed.
@@ -1553,6 +1560,9 @@ int main(int argc, char **argv) {
       if (!cpu2_installed && (fan == 1)) {
         continue;
       }
+      if (fan_population_map[fan] == 0) {
+        continue;
+      }
       if (fan_bad[fan] > FAN_FAILURE_THRESHOLD) {
         fan_failure++;
         write_fan_led(fan + fan_offset, FAN_LED_RED);
@@ -1580,6 +1590,9 @@ int main(int argc, char **argv) {
         if (!cpu2_installed && (fan == 1)) {
           continue;
         }
+        if (fan_population_map[fan] == 0) {
+          continue;
+        }
         write_fan_speed(fan + fan_offset, fan_max);
       }
 
@@ -1596,6 +1609,9 @@ int main(int argc, char **argv) {
         int count = 0;
         for (fan = 0; fan < total_fans; fan++) {
           if (!cpu2_installed && (fan == 1)) {
+            continue;
+          }
+          if (fan_population_map[fan] == 0) {
             continue;
           }
           if (fan_bad[fan] > FAN_SHUTDOWN_THRESHOLD)
