@@ -289,6 +289,7 @@ int fan_to_pwm_map[]     = {0, 1};
 #define REAR_FAN_OFFSET 1
 
 #elif defined(CONFIG_ASUS)
+float fan_scale_speed_map[] = {1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0};	// Chassis fans may have a different max rpm than 2000; scale the stock profile accordingly.
 int fan_population_map[] = {1, 1, 1, 1, 1, 1, 1, 1};	// 1 == fan populated, 0 == fan disconnected
 int fan_to_rpm_map[]     = {1, 2, 3, 4, 5, 6, 7, 8};
 int fan_to_pwm_map[]     = {1, 1, 2, 2, 2, 2, 2, 2};	// 1 == 4 pin fans, 2 == 3 pin fans
@@ -818,7 +819,8 @@ int fan_speed_okay(const int fan, const int speed, const int slop) {
     front_pct = fan_rpm_to_pct(rpm_front_map, FRONT_MAP_SIZE, real_fan_speed);
   }
   else {
-    front_pct = fan_rpm_to_pct(rpm_rear_map, REAR_MAP_SIZE, real_fan_speed);
+    float scale = fan_scale_speed_map[fan];
+    front_pct = fan_rpm_to_pct(rpm_rear_map, REAR_MAP_SIZE, (int)(((float)real_fan_speed) / scale));
   }
   front_fan = real_fan_speed;
 #else
