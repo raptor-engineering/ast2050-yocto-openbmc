@@ -1306,7 +1306,7 @@ int main(int argc, char **argv) {
     if (log_count++ % report_temp == 0) {
       syslog(LOG_DEBUG,
              "Temp chipset %f, CPU1 %f, CPU2 %f, "
-             "CPU fan speed %d, CPU speed changes %d"
+             "CPU fan speed %d, CPU speed changes %d "
              "chassis fan speed %d, chassis speed changes %d",
              EXTERNAL_TEMPS((float)chipset_temp),
              EXTERNAL_TEMPS((float)cpu1_temp),
