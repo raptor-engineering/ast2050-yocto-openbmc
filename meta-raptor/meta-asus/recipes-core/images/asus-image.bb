@@ -62,6 +62,7 @@ IMAGE_INSTALL += " \
   flashrom \
   cherryPy \
   screen \
+  iptables \
   "
 
 IMAGE_FEATURES += " \
